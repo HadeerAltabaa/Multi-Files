@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Persistent File Upload with Preview</title>
+  <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 20px;
+      background-color: #2c3e50;
+      color: white;
+    }
+
+    .container {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .preview-panel {
+      flex: 2;
+      padding: 20px;
+      overflow-y: auto;
+      border-right: 2px solid #ddd;
+      background-color: #f9f9f9;
+    }
+
+    .file-panel {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: #f2f2f2;
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+    }
+
+    .file-icon {
+      position: relative;
+      background-color: white;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: box-shadow 0.2s;
+    }
+
+    .file-icon:hover {
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .file-icon i {
+      font-size: 30px;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    iframe, img, pre, table {
+      width: 100%;
+      max-height: 80vh;
+    }
+
+    table {
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 5px;
+    }
+
+    input[type="file"] {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h2>📁 File Preview System (Persistent)</h2>
+  <input type="file" id="fileInput" multiple accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.docx,.xlsx,.xls,.csv" />
+</header>
+
+<div class="container">
+  <div class="preview-panel" id="preview">
+    <p>Select a file from the right to preview here.</p>
+  </div>
+  <div class="file-panel">
+    <h3>Uploaded Files</h3>
+    <div class="file-grid" id="fileGrid"></div>
+  </div>
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const fileGrid = document.getElementById('fileGrid');
+  const preview = document.getElementById('preview');
+  const storageKey = 'uploadedFiles';
+
+  // Load files from localStorage on page load
+  window.addEventListener('load', () => {
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      const files = JSON.parse(stored);
+      files.forEach(f => renderFileIcon(f));
+    }
+  });
+
+  fileInput.addEventListener('change', () => {
+    const files = Array.from(fileInput.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        const fileObj = {
+          name: file.name,
+          type: file.type,
+          content: reader.result
+        };
+        stored.push(fileObj);
+        localStorage.setItem(storageKey, JSON.stringify(stored));
+        renderFileIcon(fileObj);
+      };
+      reader.readAsDataURL(file); // for images, pdf, base64
+    });
+  });
+
+  function renderFileIcon(file) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'file-icon';
+    wrapper.innerHTML = `
+      <i class="fas ${getFileIcon(file.name)}"></i>
+      <div style="font-size: 14px;">${file.name}</div>
+      <button class="delete-btn" title="Delete file">&times;</button>
+    `;
+    wrapper.querySelector('button').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteFile(file.name);
+    });
+    wrapper.addEventListener('click', () => {
+      previewFile(file);
+    });
+    fileGrid.appendChild(wrapper);
+  }
+
+  function getFileIcon(name) {
+    const ext = name.toLowerCase().split('.').pop();
+    const iconMap = {
+      pdf: 'fa-file-pdf',
+      docx: 'fa-file-word',
+      xlsx: 'fa-file-excel',
+      xls: 'fa-file-excel',
+      csv: 'fa-file-csv',
+      txt: 'fa-file-lines',
+      jpg: 'fa-file-image',
+      jpeg: 'fa-file-image',
+      png: 'fa-file-image',
+      gif: 'fa-file-image'
+    };
+    return iconMap[ext] || 'fa-file';
+  }
+
+  function deleteFile(name) {
+    let stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
+    stored = stored.filter(f => f.name !== name);
+    localStorage.setItem(storageKey, JSON.stringify(stored));
+    fileGrid.innerHTML = '';
+    stored.forEach(f => renderFileIcon(f));
+    preview.innerHTML = `<p>Select a file from the right to preview here.</p>`;
+  }
+
+  function previewFile(file) {
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type || '';
+    preview.innerHTML = 'Loading preview...';
+
+    if (fileType.startsWith('image/')) {
+      preview.innerHTML = `<img src="${file.content}" alt="Image Preview">`;
+
+    } else if (fileType === 'application/pdf') {
+      preview.innerHTML = `<iframe src="${file.content}" height="500px"></iframe>`;
+
+    } else if (fileType.startsWith('text/') || fileName.endsWith('.txt')) {
+      fetch(file.content)
+        .then(res => res.text())
+        .then(text => {
+          preview.innerHTML = `<pre>${text}</pre>`;
+        });
+
+    } else if (fileName.endsWith('.docx')) {
+      fetch(file.content)
+        .then(res => res.arrayBuffer())
+        .then(arrayBuffer => {
+          mammoth.convertToHtml({ arrayBuffer })
+            .then(result => {
+              preview.innerHTML = result.value || "<p>Empty .docx document.</p>";
+            })
+            .catch(err => {
+              preview.innerHTML = `<p>Error reading .docx: ${err.message}</p>`;
+            });
+        });
+
+    } else if (
+      fileName.endsWith('.xlsx') ||
+      fileName.endsWith('.xls') ||
+      fileName.endsWith('.csv')
+    ) {
+      fetch(file.content)
+        .then(res => res.arrayBuffer())
+        .then(arrayBuffer => {
+          const data = new Uint8Array(arrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const sheet = workbook.Sheets[sheetName];
+          const html = XLSX.utils.sheet_to_html(sheet);
+          preview.innerHTML = html;
+        });
+
+    } else {
+      preview.innerHTML = `<p>File type not supported for preview.</p>`;
+    }
+  }
+</script>
+
+</body>
+</html>
