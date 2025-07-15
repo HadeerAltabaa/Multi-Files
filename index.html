@@ -241,7 +241,7 @@
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
           const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-          const limitedRows = json.slice(0, 5); // limit to 10 rows
+          const limitedRows = json.slice(0, 6); // limit to 5 rows
           let html = "<table>";
           limitedRows.forEach(row => {
             html += "<tr>" + row.map(cell => `<td>${cell !== undefined ? cell : ''}</td>`).join('') + "</tr>";
