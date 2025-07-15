@@ -240,7 +240,13 @@
           const workbook = XLSX.read(data, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
-          const html = XLSX.utils.sheet_to_html(sheet);
+          const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+          const limitedRows = json.slice(0, 10); // limit to 10 rows
+          let html = "<table>";
+          limitedRows.forEach(row => {
+            html += "<tr>" + row.map(cell => `<td>${cell !== undefined ? cell : ''}</td>`).join('') + "</tr>";
+          });
+          html += "</table>";
           preview.innerHTML = html;
         });
 
